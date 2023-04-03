@@ -224,10 +224,7 @@ impl Runtime {
         signed_transaction: &SignedTransaction,
         stats: &mut ApplyStats,
     ) -> Result<(Receipt, ExecutionOutcomeWithId), RuntimeError> {
-        let tx_hash = signed_transaction.get_hash();
-        let _span =
-            tracing::debug_span!(target: "runtime", "process_transaction", %tx_hash).entered();
-        tracing::trace!(target: "transaction_lifetime", %tx_hash, stage = "runtime::process_tx");
+        let _span = tracing::debug_span!(target: "runtime", "process_transaction", tx_hash = %signed_transaction.get_hash()).entered();
         metrics::TRANSACTION_PROCESSED_TOTAL.inc();
 
         match verify_and_charge_transaction(
@@ -241,7 +238,9 @@ impl Runtime {
         ) {
             Ok(verification_result) => {
                 metrics::TRANSACTION_PROCESSED_SUCCESSFULLY_TOTAL.inc();
-                state_update.commit(StateChangeCause::TransactionProcessing { tx_hash });
+                state_update.commit(StateChangeCause::TransactionProcessing {
+                    tx_hash: signed_transaction.get_hash(),
+                });
                 let transaction = &signed_transaction.transaction;
                 let receipt_id = create_receipt_id_from_transaction(
                     apply_state.current_protocol_version,
@@ -1264,11 +1263,6 @@ impl Runtime {
         let mut total_gas_burnt = gas_used_for_migrations;
 
         for signed_transaction in transactions {
-            tracing::trace!(
-                target: "transaction_lifetime",
-                tx_hash = %signed_transaction.get_hash(),
-                stage = "runtime::process_tx"
-            );
             let (receipt, outcome_with_id) = self.process_transaction(
                 &mut state_update,
                 apply_state,

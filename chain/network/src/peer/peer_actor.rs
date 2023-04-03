@@ -939,11 +939,6 @@ impl PeerActor {
                 None
             }
             RoutedMessageBody::ForwardTx(transaction) => {
-                tracing::trace!(
-                    target: "transaction_lifetime",
-                    tx_hash = %transaction.get_hash(),
-                    stage = "network::forward_tx"
-                );
                 network_state.client.transaction(transaction, /*is_forwarded=*/ true).await;
                 None
             }
