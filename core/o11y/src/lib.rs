@@ -53,12 +53,7 @@ static OTLP_LAYER_RELOAD_HANDLE: OnceCell<reload::Handle<LevelFilter, LogLayer<R
 
 type LogLayer<Inner> = Layered<
     Filtered<
-        fmt::Layer<
-            Inner,
-            fmt::format::JsonFields,
-            fmt::format::Format<fmt::format::Json, fmt::time::SystemTime>,
-            NonBlocking,
-        >,
+        fmt::Layer<Inner, fmt::format::DefaultFields, fmt::format::Format, NonBlocking>,
         reload::Layer<EnvFilter, Inner>,
         Inner,
     >,
@@ -67,12 +62,7 @@ type LogLayer<Inner> = Layered<
 
 type SimpleLogLayer<Inner, W> = Layered<
     Filtered<
-        fmt::Layer<
-            Inner,
-            fmt::format::JsonFields,
-            fmt::format::Format<fmt::format::Json, fmt::time::SystemTime>,
-            W,
-        >,
+        fmt::Layer<Inner, fmt::format::DefaultFields, fmt::format::Format, W>,
         EnvFilter,
         Inner,
     >,
@@ -215,7 +205,7 @@ where
     S: tracing::Subscriber + for<'span> LookupSpan<'span> + Send + Sync,
     W: for<'writer> fmt::MakeWriter<'writer> + 'static,
 {
-    let layer = fmt::layer().json().with_ansi(ansi).with_writer(writer).with_filter(filter);
+    let layer = fmt::layer().with_ansi(ansi).with_writer(writer).with_filter(filter);
 
     subscriber.with(layer)
 }
@@ -240,8 +230,7 @@ where
 {
     let (filter, handle) = reload::Layer::<EnvFilter, S>::new(filter);
 
-    let layer = fmt::Layer::new()
-        .json()
+    let layer = fmt::layer()
         .with_ansi(ansi)
         .with_span_events(get_fmt_span(with_span_events))
         .with_writer(writer)
