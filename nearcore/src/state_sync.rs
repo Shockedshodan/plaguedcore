@@ -2,8 +2,8 @@ use crate::{metrics, NearConfig, NightshadeRuntime};
 use borsh::BorshSerialize;
 use near_chain::types::RuntimeAdapter;
 use near_chain::{Chain, ChainGenesis, ChainStoreAccess, DoomslugThresholdMode, Error};
-use near_chain_configs::ClientConfig;
-use near_client::sync::state::{s3_location, StateSync};
+use near_chain_configs::{ClientConfig, ExternalStorageLocation};
+use near_client::sync::state::{ExternalConnection, s3_location, StateSync};
 use near_epoch_manager::EpochManagerAdapter;
 use near_primitives::hash::CryptoHash;
 use near_primitives::state_part::PartId;
@@ -19,31 +19,35 @@ pub fn spawn_state_sync_dump(
     chain_genesis: ChainGenesis,
     runtime: Arc<NightshadeRuntime>,
 ) -> anyhow::Result<Option<StateSyncDumpHandle>> {
-    if !config.client_config.state_sync_dump_enabled {
+    let dump_config = if let Some(dump_config) = config.client_config.state_sync_config.as_ref().map(|x|x.dump.clone()).flatten() {
+        dump_config
+    } else {
+        // Dump is not configured, and therefore not enabled.
         return Ok(None);
-    }
-    if config.client_config.state_sync_s3_bucket.is_empty()
-        || config.client_config.state_sync_s3_region.is_empty()
-    {
-        panic!("Enabled dumps of state to external storage. Please specify state_sync.s3_bucket and state_sync.s3_region");
-    }
+    };
     tracing::info!(target: "state_sync_dump", "Spawning the state sync dump loop");
 
-    // Create a connection to S3.
-    let s3_bucket = config.client_config.state_sync_s3_bucket.clone();
-    let s3_region = config.client_config.state_sync_s3_region.clone();
-
-    // Credentials to establish a connection are taken from environment variables: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
-    let bucket = s3::Bucket::new(
-        &s3_bucket,
-        s3_region
-            .parse::<s3::Region>()
-            .map_err(|err| <std::str::Utf8Error as Into<anyhow::Error>>::into(err))?,
-        s3::creds::Credentials::default().map_err(|err| {
-            tracing::error!(target: "state_sync_dump", "Failed to create a connection to S3. Did you provide environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY?");
-            <s3::creds::error::CredentialsError as Into<anyhow::Error>>::into(err)
-        })?,
-    ).map_err(|err| <s3::error::S3Error as Into<anyhow::Error>>::into(err))?;
+    let external = match dump_config.location {
+        ExternalStorageLocation::S3 { bucket, region } => {
+            // Credentials to establish a connection are taken from environment variables:
+            // * `AWS_ACCESS_KEY_ID`
+            // * `AWS_SECRET_ACCESS_KEY`
+            let bucket = s3::Bucket::new(
+                &bucket,
+                region
+                    .parse::<s3::Region>()
+                    .map_err(|err| <std::str::Utf8Error as Into<anyhow::Error>>::into(err))?,
+                s3::creds::Credentials::default().map_err(|err| {
+                    tracing::error!(target: "state_sync_dump", "Failed to create a connection to S3. Did you provide environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY?");
+                    <s3::creds::error::CredentialsError as Into<anyhow::Error>>::into(err)
+                })?,
+            ).map_err(|err| <s3::error::S3Error as Into<anyhow::Error>>::into(err))?;
+            ExternalConnection::S3{bucket: Arc::new(bucket)}
+        }
+        ExternalStorageLocation::Filesystem {root_dir  } => {
+            ExternalConnection::Filesystem{root_dir}
+        }
+    };
 
     // Determine how many threads to start.
     // TODO: Handle the case of changing the shard layout.
@@ -77,8 +81,9 @@ pub fn spawn_state_sync_dump(
                 shard_id as ShardId,
                 chain,
                 runtime,
-                client_config,
-                bucket.clone(),
+                client_config.chain_id.clone(),
+                dump_config.restart_dump_for_shards.unwrap_or_default(),
+                external,
             )));
             arbiter_handle
         })
@@ -111,12 +116,13 @@ async fn state_sync_dump(
     shard_id: ShardId,
     chain: Chain,
     runtime: Arc<NightshadeRuntime>,
-    config: ClientConfig,
-    bucket: s3::Bucket,
+    chain_id: String,
+    restart_dump_for_shards: Vec<ShardId>,
+    external: ExternalConnection,
 ) {
     tracing::info!(target: "state_sync_dump", shard_id, "Running StateSyncDump loop");
 
-    if config.state_sync_restart_dump_for_shards.contains(&shard_id) {
+    if restart_dump_for_shards.contains(&shard_id) {
         tracing::debug!(target: "state_sync_dump", shard_id, "Dropped existing progress");
         chain.store().set_state_sync_dump_progress(shard_id, None).unwrap();
     }
@@ -191,14 +197,13 @@ async fn state_sync_dump(
                                 }
                             };
                             let location = s3_location(
-                                &config.chain_id,
+                                &chain_id,
                                 epoch_height,
                                 shard_id,
                                 part_id,
                                 num_parts,
                             );
-                            if let Err(err) =
-                                put_state_part(&location, &state_part, &shard_id, &bucket).await
+                            if let Err(err) = external.put_state_part(&state_part, shard_id, &location).await
                             {
                                 res = Some(err);
                                 break;
@@ -251,23 +256,6 @@ async fn state_sync_dump(
             }
         }
     }
-}
-
-async fn put_state_part(
-    location: &str,
-    state_part: &[u8],
-    shard_id: &ShardId,
-    bucket: &s3::Bucket,
-) -> Result<s3::request_trait::ResponseData, Error> {
-    let _timer = metrics::STATE_SYNC_DUMP_PUT_OBJECT_ELAPSED
-        .with_label_values(&[&shard_id.to_string()])
-        .start_timer();
-    let put = bucket
-        .put_object(&location, &state_part)
-        .await
-        .map_err(|err| Error::Other(err.to_string()));
-    tracing::debug!(target: "state_sync_dump", shard_id, part_length = state_part.len(), ?location, "Wrote a state part to S3");
-    put
 }
 
 fn update_progress(

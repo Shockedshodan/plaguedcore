@@ -29,6 +29,7 @@ use near_async::messaging::CanSendAsync;
 use near_chain::chain::{ApplyStatePartsRequest, StateSplitRequest};
 use near_chain::near_chain_primitives;
 use near_chain::{Chain, RuntimeWithEpochManagerAdapter};
+use near_chain_configs::{ExternalStorageConfig, ExternalStorageLocation, SyncConfig};
 use near_client_primitives::types::{
     DownloadStatus, ShardSyncDownload, ShardSyncStatus, StateSplitApplyingStatus,
 };
@@ -47,6 +48,7 @@ use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 use std::ops::Add;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration as TimeDuration;
@@ -110,12 +112,107 @@ enum StateSyncInner {
     PartsFromExternal {
         /// Chain ID.
         chain_id: String,
-        /// Connection to the external storage.
-        bucket: Arc<s3::Bucket>,
         /// The number of requests for state parts from external storage that are
         /// allowed to be started for this shard.
         requests_remaining: Arc<AtomicI64>,
+        /// Connection to the external storage.
+        external: ExternalConnection,
     },
+}
+
+/// Errors encountered while accessing state parts from external storage.
+#[derive(thiserror::Error, Debug)]
+enum ExternalStorageError {
+    #[error("S3 request failed: {0}")]
+    S3Error(#[from] s3::error::S3Error),
+    #[error("Wrong response code: {0}")]
+    S3ResponseCode(u16),
+    #[error("Filesystem error: {0}")]
+    FilesystemError(#[from] std::io::Error)
+}
+
+/// Connection to the external storage.
+#[derive(Clone)]
+pub enum ExternalConnection {
+    S3 { bucket: Arc<s3::Bucket> },
+    Filesystem { root_dir: PathBuf },
+}
+
+impl ExternalConnection {
+    async fn get_part(self, shard_id: ShardId, location: &str) -> Result<Vec<u8>, ExternalStorageError> {
+        let started = StaticClock::utc();
+        let result = match self {
+            ExternalConnection::S3 { bucket } => {
+                tracing::info!(target: "sync", %shard_id, location, "Getting an object from the external storage");
+                let result = bucket.get_object(location.clone()).await;
+                match result {
+                    Ok(response) => {
+                        tracing::info!(target: "sync", %shard_id, location, response_code = response.status_code(), num_bytes = response.bytes().len(), "S3 request finished");
+                        if response.status_code() == 200 {
+                            Ok(response.bytes().to_vec())
+                        } else {
+                            Err(ExternalStorageError::S3ResponseCode(response.status_code()))
+                        }
+                    }
+                    Err(err) => {
+                        Err(ExternalStorageError::S3Error(err))
+                    }
+                }
+            }
+            ExternalConnection::Filesystem { root_dir } => {
+                let path = root_dir.join(location.clone());
+                tracing::info!(target: "sync", %shard_id, ?path, "Reading a file");
+                let result = std::fs::read(&path);
+                result.map_err(ExternalStorageError::FilesystemError)
+            }
+        };
+        let completed = StaticClock::utc();
+        metrics::STATE_SYNC_EXTERNAL_PARTS_REQUEST_DELAY
+            .with_label_values(&[&shard_id.to_string()])
+            .observe(
+                completed.signed_duration_since(started).num_nanoseconds().unwrap_or(0) as f64
+                    / 1e9,
+            );
+        result
+    }
+
+    async fn put_state_part(
+        self,
+        state_part: &[u8],
+        shard_id: ShardId,
+        location: &str,
+    ) -> Result<(), ExternalStorageError> {
+        let _timer = metrics::STATE_SYNC_DUMP_PUT_OBJECT_ELAPSED
+            .with_label_values(&[&shard_id.to_string()])
+            .start_timer();
+        match self {
+            ExternalConnection::S3 { bucket } => {
+                let put = bucket
+                    .put_object(&location, &state_part)
+                    .await;
+                match put {
+                    Ok(_) => {
+                        tracing::warn!(target: "state_sync_dump", shard_id, part_length = state_part.len(), ?location, "Wrote a state part to S3");
+                        Ok(())
+                    }
+                    Err(err) => {
+                        tracing::warn!(target: "state_sync_dump", shard_id, part_length = state_part.len(), ?location, ?err, "Failed to write a state part to S3");
+                        Err(ExternalStorageError::S3Error(err))
+                    }
+                }
+            }
+            ExternalConnection::Filesystem { root_dir } => {
+                let path = root_dir.join(location);
+                let dir = path.parent().map_err(ExternalStorageError::FilesystemError)?;
+                std::fs::create_dir_all(dir).map_err(ExternalStorageError::FilesystemError)?;
+                let mut file = std::fs::OpenOptions::new().write(true).create(true).open(&path).map_err(ExternalStorageError::FilesystemError)?;
+                file.write_all(state_part).map_err(ExternalStorageError::FilesystemError)?;
+                tracing::debug!(target: "state_sync_dump", shard_id, part_length = state_part.len(), ?location, "Wrote a state part to a file");
+                Ok(())
+            }
+        }
+    }
+
 }
 
 /// Helper to track state sync.
@@ -146,31 +243,40 @@ impl StateSync {
         network_adapter: PeerManagerAdapter,
         timeout: TimeDuration,
         chain_id: &str,
-        state_sync_from_s3_enabled: bool,
-        s3_bucket: &str,
-        s3_region: &str,
-        num_s3_requests_per_shard: u64,
+        sync_config: SyncConfig,
     ) -> Self {
-        let inner = if state_sync_from_s3_enabled {
-            let mut bucket = s3::Bucket::new(
-                s3_bucket,
-                s3_region.parse::<s3::Region>().unwrap(),
-                s3::creds::Credentials::default().unwrap(),
-            )
-            .unwrap();
-            // Ensure requests finish in finite amount of time.
-            bucket.set_request_timeout(Some(timeout));
-            let bucket = Arc::new(bucket);
-
-            StateSyncInner::PartsFromExternal {
-                chain_id: chain_id.to_string(),
-                bucket,
-                requests_remaining: Arc::new(AtomicI64::new(num_s3_requests_per_shard as i64)),
-            }
-        } else {
-            StateSyncInner::Peers {
+        let inner = match sync_config {
+            SyncConfig::Peers => StateSyncInner::Peers {
                 last_part_id_requested: Default::default(),
                 requested_target: lru::LruCache::new(MAX_PENDING_PART as usize),
+            },
+            SyncConfig::ExternalStorage(ExternalStorageConfig {
+                                            location,
+                                            num_concurrent_requests,
+                                        }) => {
+                let external = match location {
+                    ExternalStorageLocation::S3 { bucket, region } => {
+                        let mut bucket = s3::Bucket::new(
+                            &bucket,
+                            region.parse::<s3::Region>().unwrap(),
+                            s3::creds::Credentials::anonymous().unwrap(),
+                        )
+                            .unwrap();
+                        // Ensure requests finish in finite amount of time.
+                        bucket.set_request_timeout(Some(timeout));
+                        let bucket = Arc::new(bucket);
+
+                        ExternalConnection::S3 { bucket }
+                    }
+                    ExternalStorageLocation::Filesystem { root_dir } => {
+                        ExternalConnection::Filesystem { root_dir }
+                    }
+                };
+                StateSyncInner::PartsFromExternal {
+                    chain_id: chain_id.to_string(),
+                    requests_remaining: Arc::new(AtomicI64::new(num_concurrent_requests as i64)),
+                    external,
+                }
             }
         };
         let timeout = Duration::from_std(timeout).unwrap();
@@ -645,7 +751,7 @@ impl StateSync {
                     );
                 }
             }
-            StateSyncInner::PartsFromExternal { chain_id, bucket, requests_remaining } => {
+            StateSyncInner::PartsFromExternal { chain_id, requests_remaining, external } => {
                 let sync_block_header = chain.get_block_header(&sync_hash).unwrap();
                 let epoch_id = sync_block_header.epoch_id();
                 let epoch_info = chain.runtime_adapter.get_epoch_info(epoch_id).unwrap();
@@ -663,8 +769,8 @@ impl StateSync {
                         epoch_height,
                         state_num_parts,
                         &chain_id.clone(),
-                        bucket.clone(),
                         requests_remaining.clone(),
+                        external.clone(),
                     );
                 }
             }
@@ -1092,8 +1198,8 @@ fn request_part_from_external_storage(
     epoch_height: EpochHeight,
     num_parts: u64,
     chain_id: &str,
-    bucket: Arc<s3::Bucket>,
     requests_remaining: Arc<AtomicI64>,
+    external: ExternalConnection,
 ) {
     if !allow_request(&requests_remaining) {
         return;
@@ -1107,40 +1213,14 @@ fn request_part_from_external_storage(
     download.last_target =
         Some(make_account_or_peer_id_or_hash(AccountOrPeerIdOrHash::ExternalStorage));
 
-    let location = s3_location(chain_id, epoch_height, shard_id, part_id, num_parts);
     let download_response = download.response.clone();
-    let scheduled = StaticClock::utc();
+    let location = s3_location(chain_id, epoch_height, shard_id, part_id, num_parts);
     near_performance_metrics::actix::spawn("StateSync", {
         async move {
-            tracing::info!(target: "sync", %shard_id, part_id, location, "Getting an object from the external storage");
-            let started = StaticClock::utc();
-            metrics::STATE_SYNC_EXTERNAL_PARTS_SCHEDULING_DELAY
-                .with_label_values(&[&shard_id.to_string()])
-                .observe(
-                    started.signed_duration_since(scheduled).num_nanoseconds().unwrap_or(0) as f64
-                        / 1e9,
-                );
-            let result = bucket.get_object(location.clone()).await;
-            let completed = StaticClock::utc();
+            let result = external.get_part(shard_id, &location).await;
             finished_request(&requests_remaining);
-            metrics::STATE_SYNC_EXTERNAL_PARTS_REQUEST_DELAY
-                .with_label_values(&[&shard_id.to_string()])
-                .observe(
-                    completed.signed_duration_since(started).num_nanoseconds().unwrap_or(0) as f64
-                        / 1e9,
-                );
-            match result {
-                Ok(response) => {
-                    tracing::info!(target: "sync", %shard_id, part_id, location, response_code = response.status_code(), num_bytes = response.bytes().len(), "S3 request finished");
-                    let mut lock = download_response.lock().unwrap();
-                    *lock = Some(Ok((response.status_code(), response.bytes().to_vec())));
-                }
-                Err(err) => {
-                    tracing::info!(target: "sync", %shard_id, part_id, location, ?err, "S3 request failed");
-                    let mut lock = download_response.lock().unwrap();
-                    *lock = Some(Err(err.to_string()));
-                }
-            }
+            let mut lock = download_response.lock().unwrap();
+            *lock = Some(result.map_err(|err|err.to_string()));
         }
     });
 }
@@ -1244,8 +1324,7 @@ fn check_external_storage_part_response(
     let mut err_to_retry = None;
     match external_storage_response {
         // HTTP status code 200 means success.
-        Ok((200, data)) => {
-            tracing::debug!(target: "sync", %shard_id, part_id, "Got 200 response from external storage");
+        Ok(data) => {
             match chain.set_state_part(
                 shard_id,
                 sync_hash,
@@ -1271,11 +1350,6 @@ fn check_external_storage_part_response(
                         Some(near_chain::Error::Other("Failed to save a state part".to_string()));
                 }
             }
-        }
-        // Other HTTP status codes are considered errors.
-        Ok((status_code, _)) => {
-            tracing::debug!(target: "sync", %shard_id, %sync_hash, part_id, status_code, "Wrong response code, expected 200");
-            err_to_retry = Some(near_chain::Error::Other(format!("status_code: {}", status_code)));
         }
         // The request failed without reaching the external storage.
         Err(err) => {
@@ -1471,7 +1545,7 @@ mod test {
                 Provenance::PRODUCED,
                 &mut BlockProcessingArtifact::default(),
             )
-            .unwrap();
+                .unwrap();
         }
 
         let request_hash = &chain.head().unwrap().last_block_hash;

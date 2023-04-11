@@ -5,6 +5,7 @@ use near_primitives::types::{
 };
 use near_primitives::version::Version;
 use std::cmp::{max, min};
+use std::path::PathBuf;
 use std::time::Duration;
 
 pub const TEST_STATE_SYNC_TIMEOUT: u64 = 5;
@@ -22,6 +23,9 @@ pub const MIN_GC_NUM_EPOCHS_TO_KEEP: u64 = 3;
 
 /// Default number of epochs for which we keep store data
 pub const DEFAULT_GC_NUM_EPOCHS_TO_KEEP: u64 = 5;
+
+/// Default number of concurrent requests to external storage to fetch state parts.
+pub const DEFAULT_STATE_SYNC_NUM_CONCURRENT_REQUESTS_EXTERNAL: u64 = 25;
 
 /// Configuration for garbage collection.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -66,6 +70,74 @@ fn default_gc_num_epochs_to_keep() -> u64 {
 impl GCConfig {
     pub fn gc_num_epochs_to_keep(&self) -> u64 {
         max(MIN_GC_NUM_EPOCHS_TO_KEEP, self.gc_num_epochs_to_keep)
+    }
+}
+
+fn default_num_concurrent_requests() -> u64 {
+    DEFAULT_STATE_SYNC_NUM_CONCURRENT_REQUESTS_EXTERNAL
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct ExternalStorageConfig {
+    /// Location of state parts.
+    pub location: ExternalStorageLocation,
+    /// When fetching state parts from external storage, throttle fetch requests
+    /// to this many concurrent requests per shard.
+    #[serde(default = "default_num_concurrent_requests")]
+    pub num_concurrent_requests: u64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub enum ExternalStorageLocation {
+    S3 {
+        /// Location of state dumps on S3.
+        bucket: String,
+        /// Data may only be available in certain locations.
+        region: String,
+    },
+    Filesystem {
+        root_dir: PathBuf,
+    },
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct DumpConfig {
+    /// Specifies where to write the obtained state parts.
+    pub location: ExternalStorageLocation,
+    /// Use in case a node that dumps state to the external storage
+    /// gets in trouble.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restart_dump_for_shards: Option<Vec<ShardId>>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub enum SyncConfig {
+    /// Syncs state from the peers without reading anything from external storage.
+    Peers,
+    /// Expects parts to be available in external storage.
+    ExternalStorage(ExternalStorageConfig),
+}
+
+impl Default for SyncConfig {
+    fn default() -> Self {
+        Self::Peers
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+/// Options for dumping state to S3.
+pub struct StateSyncConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// `none` value disables state dump to external storage.
+    pub dump: Option<DumpConfig>,
+    #[serde(skip_serializing_if = "SyncConfig::is_default")]
+    pub sync: SyncConfig,
+}
+
+impl SyncConfig {
+    /// Checks whether the object equals its default value.
+    fn is_default(&self) -> bool {
+        matches!(self, Self::Peers)
     }
 }
 
@@ -166,23 +238,12 @@ pub struct ClientConfig {
     pub client_background_migration_threads: usize,
     /// Duration to perform background flat storage creation step.
     pub flat_storage_creation_period: Duration,
-    /// If enabled, will dump state of every epoch to external storage.
-    pub state_sync_dump_enabled: bool,
-    /// S3 bucket for storing state dumps.
-    pub state_sync_s3_bucket: String,
-    /// S3 region for storing state dumps.
-    pub state_sync_s3_region: String,
-    /// Restart dumping state of selected shards.
-    /// Use for troubleshooting of the state dumping process.
-    pub state_sync_restart_dump_for_shards: Vec<ShardId>,
-    /// Whether to enable state sync from S3.
-    /// If disabled will perform state sync from the peers.
-    pub state_sync_from_s3_enabled: bool,
-    /// Number of parallel in-flight requests allowed per shard.
-    pub state_sync_num_concurrent_s3_requests: u64,
     /// Whether to use the State Sync mechanism.
     /// If disabled, the node will do Block Sync instead of State Sync.
     pub state_sync_enabled: bool,
+    /// Configures how to sync state from peers or external storage.
+    /// And configures whether to dump state of every epoch to external storage.
+    pub state_sync_config: Option<StateSyncConfig>,
 }
 
 impl ClientConfig {
@@ -252,13 +313,8 @@ impl ClientConfig {
             enable_statistics_export: true,
             client_background_migration_threads: 1,
             flat_storage_creation_period: Duration::from_secs(1),
-            state_sync_dump_enabled: false,
-            state_sync_s3_bucket: String::new(),
-            state_sync_s3_region: String::new(),
-            state_sync_restart_dump_for_shards: vec![],
-            state_sync_from_s3_enabled: false,
-            state_sync_num_concurrent_s3_requests: 10,
             state_sync_enabled: false,
+            state_sync_config: None,
         }
     }
 }
