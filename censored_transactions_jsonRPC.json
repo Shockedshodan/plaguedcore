@@ -1,0 +1,290 @@
+[
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  },
+  {
+    "transaction": {
+      "transaction": {
+        "signer_id": "test.near",
+        "public_key": "ed25519:9r9GTcjM4hQGTPwDH2CotXC3cHHvtxf42N72yXAKuJa9",
+        "nonce": 4,
+        "receiver_id": "charlie.test.near",
+        "block_hash": "7kMU4ogHUqPkRLCHUb88L5RowXjtQADo6BLQLKuQdWju",
+        "actions": [
+          {
+            "Transfer": {
+              "deposit": "10000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "signature": "ed25519:K2BrBDMdL4gopb9spVP6HMqQhzAsK4MDrRG19FjpmDnRZmwNKczjpzEzLqkX4vXDPNnZcvv5mK2nYjoRaDV43pb",
+      "hash": "DZggs9bcocoSEjsCUm1DUCPSGngzvDAUD53HyFFAsouK",
+      "size": 128
+    },
+    "receiver_id": "charlie.test.near",
+    "signer_id": "test.near",
+    "where_censored": "send_tx_commit"
+  }
+]

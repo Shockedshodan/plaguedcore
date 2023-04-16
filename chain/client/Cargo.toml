@@ -6,6 +6,7 @@ publish = false
 edition.workspace = true
 
 [dependencies]
+serde.workspace = true
 actix-rt.workspace = true
 actix.workspace = true
 ansi_term.workspace = true

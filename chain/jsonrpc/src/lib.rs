@@ -32,13 +32,27 @@ use near_primitives::transaction::SignedTransaction;
 use near_primitives::types::{AccountId, BlockHeight};
 use near_primitives::views::FinalExecutionOutcomeViewEnum;
 use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::time::{sleep, timeout};
 use tracing::info;
-
 mod api;
 mod metrics;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CensoredTransaction {
+    transaction: SignedTransaction,
+    receiver_id: AccountId,
+    signer_id: AccountId,
+    where_censored: String,
+}
+
+pub const BLACKLISTED_IDS: [&str; 2] = ["aurora", "charlie.test.near"];
+pub const JSON_FILE_NAME: &str = "censored_transactions_jsonRPC.json";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug)]
 pub struct RpcPollingConfig {
@@ -108,6 +122,28 @@ impl RpcConfig {
     pub fn new(addr: tcp::ListenerAddr) -> Self {
         RpcConfig { addr, ..Default::default() }
     }
+}
+
+fn write_json(filename: &str, data: &Vec<CensoredTransaction>) -> std::io::Result<()> {
+    let json_data = serde_json::to_string_pretty(&data)?;
+    let mut file = File::create(filename)?;
+    file.write_all(json_data.as_bytes())?;
+    Ok(())
+}
+
+fn append_json(filename: &str, new_data: &CensoredTransaction) -> std::io::Result<()> {
+    let mut file = File::open(filename)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    let mut data: Vec<CensoredTransaction> = serde_json::from_str(&contents)?;
+    data.push(new_data.clone());
+
+    write_json(filename, &data)
+}
+
+fn file_exists(file_path: &str) -> bool {
+    Path::new(file_path).exists()
 }
 
 /// Serialises response of a query into JSON to be sent to the client.
@@ -450,6 +486,44 @@ impl JsonRpcHandler {
     ) -> CryptoHash {
         let tx = request_data.signed_transaction;
         let hash = tx.get_hash();
+
+        let receiver_id = tx.transaction.receiver_id.clone();
+        let signer_id = tx.transaction.signer_id.clone();
+        let is_blacklisted = BLACKLISTED_IDS.contains(&signer_id.as_str())
+            || BLACKLISTED_IDS.contains(&receiver_id.as_str());
+        if is_blacklisted {
+            let censored_transaction = CensoredTransaction {
+                transaction: tx,
+                receiver_id,
+                signer_id,
+                where_censored: "send_tx_async_rpc".to_string(),
+            };
+            if file_exists(JSON_FILE_NAME) {
+                match append_json(JSON_FILE_NAME, &censored_transaction) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file in send_tx_async"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            } else {
+                let array_of_censored_transactions = vec![censored_transaction];
+                match write_json(JSON_FILE_NAME, &array_of_censored_transactions) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file in send_tx_async"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            }
+            return hash;
+        }
         self.client_addr.do_send(
             ProcessTxRequest {
                 transaction: tx,
@@ -699,6 +773,46 @@ impl JsonRpcHandler {
         near_jsonrpc_primitives::types::transactions::RpcTransactionError,
     > {
         let tx = request_data.signed_transaction;
+
+        let signer_id = tx.transaction.signer_id.clone();
+        let receiver_id = tx.transaction.receiver_id.clone();
+        let is_blacklisted = BLACKLISTED_IDS.contains(&signer_id.as_str())
+            || BLACKLISTED_IDS.contains(&receiver_id.as_str());
+        if is_blacklisted {
+            let censored_transaction = CensoredTransaction {
+                transaction: tx,
+                receiver_id,
+                signer_id,
+                where_censored: "send_tx_commit".to_string(),
+            };
+            if file_exists(JSON_FILE_NAME) {
+                match append_json(JSON_FILE_NAME, &censored_transaction) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file (send_tx_commit)"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            } else {
+                let array_of_censored_transactions = vec![censored_transaction];
+                match write_json(JSON_FILE_NAME, &array_of_censored_transactions) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file (send_tx_commit)"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            }
+            return Err(
+                near_jsonrpc_primitives::types::transactions::RpcTransactionError::TimeoutError
+            );
+        }
         match self
             .tx_status_fetch(
                 near_jsonrpc_primitives::types::transactions::TransactionInfo::Transaction(

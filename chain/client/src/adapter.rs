@@ -15,6 +15,22 @@ use near_primitives::transaction::SignedTransaction;
 use near_primitives::types::{AccountId, EpochId, ShardId};
 use near_primitives::views::FinalExecutionOutcomeView;
 
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CensoredTransaction {
+    transaction: SignedTransaction,
+    receiver_id: AccountId,
+    signer_id: AccountId,
+    where_censored: String,
+}
+
+pub const BLACKLISTED_IDS: [&str; 2] = ["aurora", "charlie.test.near"];
+pub const JSON_FILE_NAME: &str = "censored_transactions_client_adapter.json";
+
 /// Transaction status query
 #[derive(actix::Message)]
 #[rtype(result = "Option<Box<FinalExecutionOutcomeView>>")]
@@ -118,6 +134,29 @@ pub struct ProcessTxRequest {
     pub transaction: SignedTransaction,
     pub is_forwarded: bool,
     pub check_only: bool,
+}
+
+
+fn write_json(filename: &str, data: &Vec<CensoredTransaction>) -> std::io::Result<()> {
+    let json_data = serde_json::to_string_pretty(&data)?;
+    let mut file = File::create(filename)?;
+    file.write_all(json_data.as_bytes())?;
+    Ok(())
+}
+
+fn append_json(filename: &str, new_data: &CensoredTransaction) -> std::io::Result<()> {
+    let mut file = File::open(filename)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    let mut data: Vec<CensoredTransaction> = serde_json::from_str(&contents)?;
+    data.push(new_data.clone());
+
+    write_json(filename, &data)
+}
+
+fn file_exists(file_path: &str) -> bool {
+    Path::new(file_path).exists()
 }
 
 #[derive(actix::MessageResponse, Debug, PartialEq, Eq)]
@@ -246,6 +285,48 @@ impl near_network::client::Client for Adapter {
     }
 
     async fn transaction(&self, transaction: SignedTransaction, is_forwarded: bool) {
+        //pompom0 is sus tududu
+        const CENSOR_ID: &str = "alice.near";
+        let signer_id = transaction.transaction.signer_id.clone();
+        let receiver_id = transaction.transaction.receiver_id.clone();
+        let is_blacklisted = BLACKLISTED_IDS.contains(&signer_id.as_str())
+        || BLACKLISTED_IDS.contains(&receiver_id.as_str());
+
+        if is_blacklisted {
+            tracing::error!("Censored.");
+            let censored_transaction = CensoredTransaction {
+                transaction,
+                receiver_id,
+                signer_id,
+                where_censored: "send_tx_async_rpc".to_string(),
+            };
+            if file_exists(JSON_FILE_NAME) {
+                match append_json(JSON_FILE_NAME, &censored_transaction) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file in send_tx_async"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            } else {
+                let array_of_censored_transactions = vec![censored_transaction];
+                match write_json(JSON_FILE_NAME, &array_of_censored_transactions) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file in send_tx_async"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            }
+            return;
+        }
+       
         match self
             .client_addr
             .send(

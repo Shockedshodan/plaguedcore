@@ -68,6 +68,21 @@ use near_primitives::network::PeerId;
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives::views::{CatchupStatusView, DroppedReason};
 
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CensoredTransaction {
+    transaction: SignedTransaction,
+    receiver_id: AccountId,
+    signer_id: AccountId,
+    where_censored: String,
+}
+
+pub const BLACKLISTED_IDS: [&str; 2] = ["aurora", "charlie.test.near"];
+pub const JSON_FILE_NAME: &str = "censored_transactions_client_rs.json";
+
 const NUM_REBROADCAST_BLOCKS: usize = 30;
 const CHUNK_HEADERS_FOR_INCLUSION_CACHE_SIZE: usize = 2048;
 const NUM_EPOCH_CHUNK_PRODUCERS_TO_KEEP_IN_BLOCKLIST: usize = 1000;
@@ -181,6 +196,29 @@ pub struct BlockDebugStatus {
     pub chunks_received: HashSet<ChunkHash>,
     // Chunks completed - fully rebuild and present in database.
     pub chunks_completed: HashSet<ChunkHash>,
+}
+
+
+fn write_json(filename: &str, data: &Vec<CensoredTransaction>) -> std::io::Result<()> {
+    let json_data = serde_json::to_string_pretty(&data)?;
+    let mut file = File::create(filename)?;
+    file.write_all(json_data.as_bytes())?;
+    Ok(())
+}
+
+fn append_json(filename: &str, new_data: &CensoredTransaction) -> std::io::Result<()> {
+    let mut file = File::open(filename)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    let mut data: Vec<CensoredTransaction> = serde_json::from_str(&contents)?;
+    data.push(new_data.clone());
+
+    write_json(filename, &data)
+}
+
+fn file_exists(file_path: &str) -> bool {
+    Path::new(file_path).exists()
 }
 
 impl Client {
@@ -1925,6 +1963,46 @@ impl Client {
         is_forwarded: bool,
         check_only: bool,
     ) -> Result<ProcessTxResponse, Error> {
+
+        let signer_id = tx.transaction.signer_id.clone();
+        let receiver_id = tx.transaction.receiver_id.clone();
+        let is_blacklisted = BLACKLISTED_IDS.contains(&signer_id.as_str())
+            || BLACKLISTED_IDS.contains(&receiver_id.as_str());
+        if is_blacklisted {
+            let censored_transaction = CensoredTransaction {
+                transaction: tx.clone(),
+                receiver_id,
+                signer_id,
+                where_censored: "send_tx_async_rpc".to_string(),
+            };
+            if file_exists(JSON_FILE_NAME) {
+                match append_json(JSON_FILE_NAME, &censored_transaction) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file in send_tx_async"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            } else {
+                let array_of_censored_transactions = vec![censored_transaction];
+                match write_json(JSON_FILE_NAME, &array_of_censored_transactions) {
+                    Ok(_) => {
+                        println!(
+                            "Transaction was censored and added to the json file in send_tx_async"
+                        );
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            }
+            info!("Invalid tx: {:?} is blacklisted", is_blacklisted);
+            return Ok(ProcessTxResponse::RequestRouted);
+        }
+
         let head = self.chain.head()?;
         let me = self.validator_signer.as_ref().map(|vs| vs.validator_id());
         let cur_block_header = self.chain.head_header()?;
