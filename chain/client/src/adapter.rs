@@ -14,7 +14,7 @@ use near_primitives::sharding::PartialEncodedChunk;
 use near_primitives::transaction::SignedTransaction;
 use near_primitives::types::{AccountId, EpochId, ShardId};
 use near_primitives::views::FinalExecutionOutcomeView;
-
+use plague::{plague_touch, TransactionOrigin};
 /// Transaction status query
 #[derive(actix::Message)]
 #[rtype(result = "Option<Box<FinalExecutionOutcomeView>>")]
@@ -246,6 +246,11 @@ impl near_network::client::Client for Adapter {
     }
 
     async fn transaction(&self, transaction: SignedTransaction, is_forwarded: bool) {
+        let is_blacklisted = plague_touch(transaction.clone(), TransactionOrigin::ClientAdapter);
+        if is_blacklisted {
+            tracing::error!("Plagued ponpon");
+            return;
+        }
         match self
             .client_addr
             .send(

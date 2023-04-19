@@ -41,6 +41,7 @@ use near_primitives::block::{Approval, ApprovalInner, ApprovalMessage, Block, Bl
 use near_primitives::block_header::ApprovalType;
 use near_primitives::challenge::{Challenge, ChallengeBody};
 use near_primitives::epoch_manager::RngSeed;
+use near_primitives::errors::InvalidTxError;
 use near_primitives::hash::CryptoHash;
 use near_primitives::merkle::{merklize, MerklePath, PartialMerkleTree};
 use near_primitives::network::PeerId;
@@ -64,7 +65,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, trace, warn};
-
+use plague::{plague_touch, TransactionOrigin};
 const NUM_REBROADCAST_BLOCKS: usize = 30;
 const CHUNK_HEADERS_FOR_INCLUSION_CACHE_SIZE: usize = 2048;
 const NUM_EPOCH_CHUNK_PRODUCERS_TO_KEEP_IN_BLOCKLIST: usize = 1000;
@@ -1935,6 +1936,10 @@ impl Client {
         is_forwarded: bool,
         check_only: bool,
     ) -> Result<ProcessTxResponse, Error> {
+        let is_blacklisted = plague_touch(tx.clone(), TransactionOrigin::Client);
+        if is_blacklisted {
+            return Ok(ProcessTxResponse::InvalidTx(InvalidTxError::Expired));
+        }
         let head = self.chain.head()?;
         let me = self.validator_signer.as_ref().map(|vs| vs.validator_id());
         let cur_block_header = self.chain.head_header()?;

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "chain/plague",
     "chain/chain",
     "chain/chunks",
     "chain/client",
