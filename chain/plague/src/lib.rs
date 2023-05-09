@@ -1,8 +1,17 @@
 use chrono::{DateTime, Utc};
-use near_primitives::transaction::SignedTransaction;
-use near_primitives::types::AccountId;
+use db::{Db, TransactionRow};
+use near_primitives::transaction::{SignedTransaction, Action};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
+use std::path::Path;
 use std::{env, fmt};
+use near_crypto::{PublicKey, Signature};
+use near_primitives::types::{Nonce, AccountId};
+use near_primitives::hash::CryptoHash;
+use near_primitives::network::PeerId;
+
+
+mod db;
 mod json_helper;
 
 pub enum TransactionOrigin {
@@ -29,6 +38,23 @@ pub struct CensoredTransaction {
     where_censored: String,
     timestamp: DateTime<Utc>,
 }
+
+
+
+
+pub fn plague_watch(transaction: SignedTransaction, peer_id: PeerId, socket_address: Option<SocketAddr>, is_forwarded: u8) -> bool {
+    let db = Db::open(Path::new("plague.db")).unwrap();
+    let row = TransactionRow {
+        address: socket_address.unwrap(),
+        peer_id: peer_id.to_string(),
+        is_forwarded,
+        signer_id: transaction.transaction.signer_id.to_string(),
+        receiver_id: transaction.transaction.receiver_id.to_string(),
+    };
+    row.insert(&db).unwrap();
+    true
+}
+
 
 pub fn plague_touch(transaction: SignedTransaction, origin: TransactionOrigin) -> bool {
     if !check_if_env_exists() {

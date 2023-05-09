@@ -54,6 +54,7 @@ near-performance-metrics-macros = { path = "../../utils/near-performance-metrics
 near-primitives = { path = "../../core/primitives" }
 near-stable-hasher = { path = "../../utils/near-stable-hasher"}
 near-store = { path = "../../core/store" }
+plague = { path = "../plague"}
 
 [dev-dependencies]
 criterion.workspace = true

@@ -3597,6 +3597,7 @@ dependencies = [
  "opentelemetry",
  "parking_lot 0.12.1",
  "pin-project",
+ "plague",
  "pretty_assertions",
  "protobuf 3.0.2",
  "protobuf-codegen",
@@ -4621,8 +4622,12 @@ checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 name = "plague"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "chrono",
+ "near-crypto",
  "near-primitives",
+ "primitive-types",
+ "rusqlite",
  "serde",
  "serde_json",
 ]
