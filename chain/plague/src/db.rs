@@ -1,18 +1,8 @@
 //! Database connection and struct representing rows in the data tables.
 
 use std::path::Path;
-use rusqlite::{params, Connection, Row};
-use chrono::{DateTime, Utc};
-use near_primitives::transaction::{SignedTransaction, Action};
-use serde::{Deserialize, Serialize};
-use std::{env, fmt};
-use near_crypto::{PublicKey, Signature};
-use near_primitives::types::{Nonce, AccountId};
-use near_primitives::hash::CryptoHash;
-use std::net::{SocketAddr};
-
-use crate::TransactionOrigin;
-
+use rusqlite::{params, Connection};
+use std::net::SocketAddr;
 
 /// Wrapper around database connection
 pub(crate) struct Db {
@@ -31,16 +21,6 @@ impl Db {
         conn.execute_batch(init_sql)?;
         Ok(Self::new(conn))
     }
-}
-pub struct ParsedTransactionRow {
-    pub signer_id: AccountId,
-    pub public_key: PublicKey,
-    pub signature: Signature,
-    pub nonce: Nonce,
-    pub receiver_id: AccountId,
-    pub block_hash: [u8; 32],
-    pub actions: Vec<Action>,
-    pub origin: TransactionOrigin,
 }
 
 pub struct TransactionRow {

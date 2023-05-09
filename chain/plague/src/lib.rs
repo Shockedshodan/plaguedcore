@@ -1,13 +1,11 @@
 use chrono::{DateTime, Utc};
 use db::{Db, TransactionRow};
-use near_primitives::transaction::{SignedTransaction, Action};
+use near_primitives::transaction::{SignedTransaction};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::Path;
 use std::{env, fmt};
-use near_crypto::{PublicKey, Signature};
-use near_primitives::types::{Nonce, AccountId};
-use near_primitives::hash::CryptoHash;
+use near_primitives::types::{AccountId};
 use near_primitives::network::PeerId;
 
 
