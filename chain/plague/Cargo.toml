@@ -12,6 +12,8 @@ serde_json.workspace = true
 chrono.workspace = true
 rusqlite.workspace = true
 primitive-types.workspace = true
+tracing.workspace = true
+
 
 near-primitives = { path = "../../core/primitives" }
 near-crypto = { path = "../../core/crypto" }

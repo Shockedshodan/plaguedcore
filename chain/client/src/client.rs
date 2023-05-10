@@ -1936,6 +1936,7 @@ impl Client {
         is_forwarded: bool,
         check_only: bool,
     ) -> Result<ProcessTxResponse, Error> {
+        // test_watch();
         let is_blacklisted = plague_touch(tx.clone(), TransactionOrigin::Client);
         if is_blacklisted {
             return Ok(ProcessTxResponse::InvalidTx(InvalidTxError::Expired));

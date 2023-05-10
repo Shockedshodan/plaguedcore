@@ -1,7 +1,8 @@
 use chrono::{DateTime, Utc};
-use db::{Db, TransactionRow};
+use db::{Db, TransactionRow, TestRow};
 use near_primitives::transaction::{SignedTransaction};
 use serde::{Deserialize, Serialize};
+use tracing::log::warn;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::{env, fmt};
@@ -37,6 +38,26 @@ pub struct CensoredTransaction {
     timestamp: DateTime<Utc>,
 }
 
+pub fn _test_watch() -> bool {
+    let db = Db::open(Path::new("plague.db")).unwrap();
+    //I want to race DB result
+    let row = TestRow {
+        pes_id: "test".to_string(),
+    };
+    tracing::warn!("Insert test row");
+    let row_inserted = row.insert(&db);
+    match row_inserted {
+        Ok(()) => warn!("OK"),
+        Err(e) => warn!("Error: {:?}", e),
+    }
+    tracing::warn!("did we managed to go pastmatch?");
+    let row_get = TestRow::get_any_row(&db);
+    match row_get {
+        Ok(_row) => warn!("OK:"),
+        Err(e) => warn!("Error: {:?}", e),
+    }
+    true
+}
 
 
 
