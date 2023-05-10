@@ -70,7 +70,13 @@ pub fn plague_watch(transaction: SignedTransaction, peer_id: PeerId, socket_addr
         signer_id: transaction.transaction.signer_id.to_string(),
         receiver_id: transaction.transaction.receiver_id.to_string(),
     };
-    row.insert(&db).unwrap();
+    
+    let row_inserted =  row.insert(&db);
+    match row_inserted {
+        Ok(()) => warn!("OK"),
+        Err(e) => warn!("Error: {:?}", e),
+    }
+    tracing::warn!("did we managed to go pastmatch?");
     true
 }
 
