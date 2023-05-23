@@ -34,6 +34,30 @@ pub struct TransactionRow {
     pub receiver_id: String,
 }
 
+
+pub struct MiddleManRow {
+    pub validator: String,
+    pub balance_nonce: String,
+    pub signer_id: String,
+    pub receiver_id: String,
+}
+
+
+impl MiddleManRow {
+    pub(crate) fn insert(&self, db: &Db) -> anyhow::Result<()> {
+        db.conn.execute(
+            "INSERT INTO transactions(validator, balance_nonce, signer_id, receiver_id) values (?1,?2,?3,?4)",
+            params![
+                self.validator,
+                self.balance_nonce,
+                self.signer_id,
+                self.receiver_id
+            ],
+        )?;
+        Ok(())
+    }
+}
+
 pub struct TestRow {
     pub pes_id: String,
 }

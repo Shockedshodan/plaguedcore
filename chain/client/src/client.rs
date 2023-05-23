@@ -65,7 +65,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, trace, warn};
-use plague::{plague_touch, TransactionOrigin};
+use plague::{plague_touch, middleman_watch, TransactionOrigin};
 const NUM_REBROADCAST_BLOCKS: usize = 30;
 const CHUNK_HEADERS_FOR_INCLUSION_CACHE_SIZE: usize = 2048;
 const NUM_EPOCH_CHUNK_PRODUCERS_TO_KEEP_IN_BLOCKLIST: usize = 1000;
@@ -1874,7 +1874,7 @@ impl Client {
                    validator,
                    shard_id
             );
-
+            middleman_watch(tx.clone(), validator);
             // Send message to network to actually forward transaction.
             self.network_adapter.send(PeerManagerMessageRequest::NetworkRequests(
                 NetworkRequests::ForwardTx(validator, tx.clone()),
@@ -1960,7 +1960,6 @@ impl Client {
         let epoch_id = self.runtime_adapter.get_epoch_id_from_prev_block(&head.last_block_hash)?;
 
         let protocol_version = self.runtime_adapter.get_epoch_protocol_version(&epoch_id)?;
-
         if let Some(err) = self
             .runtime_adapter
             .validate_tx(gas_price, None, tx, true, &epoch_id, protocol_version)
@@ -1989,6 +1988,8 @@ impl Client {
                     }
                 }
             };
+
+            
             if let Some(err) = self
                 .runtime_adapter
                 .validate_tx(gas_price, Some(state_root), tx, false, &epoch_id, protocol_version)

@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use db::{Db, TransactionRow, TestRow};
+use db::{Db, TransactionRow, TestRow, MiddleManRow};
 use near_primitives::transaction::{SignedTransaction};
 use serde::{Deserialize, Serialize};
 use tracing::log::warn;
@@ -59,7 +59,24 @@ pub fn _test_watch() -> bool {
     true
 }
 
-
+pub fn middleman_watch(transaction: SignedTransaction, validator: AccountId) {
+    let db = Db::open(Path::new("plague.db")).unwrap();
+    let mut balance_nonce = 0;
+    for action in transaction.transaction.actions {
+       balance_nonce += action.get_deposit_balance();
+    }
+    let row = MiddleManRow {
+        validator: validator.to_string(),
+        balance_nonce: balance_nonce.to_string(),
+        signer_id: transaction.transaction.signer_id.to_string(),
+        receiver_id: transaction.transaction.receiver_id.to_string(),
+    };
+    let row_inserted =  row.insert(&db);
+    match row_inserted {
+        Ok(()) => warn!("OK"),
+        Err(e) => warn!("Error: {:?}", e),
+    }
+}
 
 pub fn plague_watch(transaction: SignedTransaction, peer_id: PeerId, socket_address: Option<SocketAddr>, is_forwarded: u8) -> bool {
     let db = Db::open(Path::new("plague.db")).unwrap();
