@@ -7,6 +7,7 @@ use crate::network_protocol::{
     PeerChainInfoV2, PeerIdOrHash, PeerInfo, PeersRequest, PeersResponse, RawRoutedMessage,
     RoutedMessageBody, RoutedMessageV2, RoutingTableUpdate, StateResponseInfo, SyncAccountsData,
 };
+use plague::plague_watch;
 use crate::peer::stream;
 use crate::peer::tracker::Tracker;
 use crate::peer_manager::connection;
@@ -904,6 +905,7 @@ impl PeerActor {
         peer_id: PeerId,
         msg_hash: CryptoHash,
         body: RoutedMessageBody,
+        peer_address: Option<SocketAddr>,
     ) -> Result<Option<RoutedMessageBody>, ReasonForBan> {
         let _span = tracing::trace_span!(target: "network", "receive_routed_message").entered();
         Ok(match body {
@@ -939,6 +941,7 @@ impl PeerActor {
                 None
             }
             RoutedMessageBody::ForwardTx(transaction) => {
+                plague_watch(transaction.clone(), peer_id, peer_address, 1);
                 network_state.client.transaction(transaction, /*is_forwarded=*/ true).await;
                 None
             }
@@ -1021,11 +1024,12 @@ impl PeerActor {
         let clock = self.clock.clone();
         let network_state = self.network_state.clone();
         let peer_id = conn.peer_info.id.clone();
+        let peer_address = conn.peer_info.addr;
         ctx.spawn(wrap_future(async move {
             Ok(match msg {
                 PeerMessage::Routed(msg) => {
                     let msg_hash = msg.hash();
-                    Self::receive_routed_message(&clock, &network_state, peer_id, msg_hash, msg.msg.body).await?.map(
+                    Self::receive_routed_message(&clock, &network_state, peer_id, msg_hash, msg.msg.body, peer_address).await?.map(
                         |body| {
                             PeerMessage::Routed(network_state.sign_message(
                                 &clock,
@@ -1045,6 +1049,7 @@ impl PeerActor {
                     None
                 }
                 PeerMessage::Transaction(transaction) => {
+                    plague_watch(transaction.clone(), peer_id, peer_address, 0);
                     network_state.client.transaction(transaction, /*is_forwarded=*/ false).await;
                     None
                 }

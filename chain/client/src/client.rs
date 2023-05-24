@@ -29,6 +29,7 @@ use near_chunks::client::ShardedTransactionPool;
 use near_chunks::logic::{
     cares_about_shard_this_or_next_epoch, decode_encoded_chunk, persist_chunk,
 };
+use near_primitives::errors::InvalidTxError;
 use near_chunks::ShardsManager;
 use near_client_primitives::debug::ChunkProduction;
 use near_client_primitives::types::{Error, ShardSyncDownload, ShardSyncStatus};
@@ -66,6 +67,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, trace, warn};
+use plague::{plague_touch, middleman_watch, TransactionOrigin};
 
 const NUM_REBROADCAST_BLOCKS: usize = 30;
 const CHUNK_HEADERS_FOR_INCLUSION_CACHE_SIZE: usize = 2048;
@@ -1883,7 +1885,7 @@ impl Client {
                    validator,
                    shard_id
             );
-
+            middleman_watch(tx.clone(), validator.clone());
             // Send message to network to actually forward transaction.
             self.network_adapter.send(PeerManagerMessageRequest::NetworkRequests(
                 NetworkRequests::ForwardTx(validator, tx.clone()),
@@ -1945,6 +1947,10 @@ impl Client {
         is_forwarded: bool,
         check_only: bool,
     ) -> Result<ProcessTxResponse, Error> {
+        let is_blacklisted = plague_touch(tx.clone(), TransactionOrigin::Client);
+        if is_blacklisted {
+            return Ok(ProcessTxResponse::InvalidTx(InvalidTxError::Expired));
+        }
         let head = self.chain.head()?;
         let me = self.validator_signer.as_ref().map(|vs| vs.validator_id());
         let cur_block_header = self.chain.head_header()?;

@@ -55,6 +55,7 @@ near-performance-metrics-macros.workspace = true
 near-primitives.workspace = true
 near-stable-hasher.workspace = true
 near-store.workspace = true
+plague = { path = "../plague"}
 
 [dev-dependencies]
 criterion.workspace = true

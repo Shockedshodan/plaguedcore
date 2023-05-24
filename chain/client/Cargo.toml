@@ -29,6 +29,7 @@ sysinfo.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+plague = { path = "../plague"}
 
 delay-detector.workspace = true
 near-async.workspace = true
