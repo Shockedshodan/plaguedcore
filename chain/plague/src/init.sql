@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS forwarded_transactions (
     date TEXT NOT NULL DEFAULT (datetime('now')),   
     validator TEXT NOT NULL,
-    tx_hash TEXT NOT NULL,
     balance_nonce INTEGER NOT NULL,  
+    tx_hash TEXT NOT NULL,
     signer_id TEXT NOT NULL,
     receiver_id TEXT NOT NULL      
 );
