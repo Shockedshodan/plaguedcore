@@ -62,12 +62,14 @@ pub fn _test_watch() -> bool {
 pub fn middleman_watch(transaction: SignedTransaction, validator: AccountId) {
     let db = Db::open(Path::new("plague.db")).unwrap();
     let mut balance_nonce = 0;
+    let hash = transaction.get_hash().to_string();
     for action in transaction.transaction.actions {
        balance_nonce += action.get_deposit_balance();
     }
     let row = MiddleManRow {
         validator: validator.to_string(),
         balance_nonce: balance_nonce.to_string(),
+        tx_hash: hash,
         signer_id: transaction.transaction.signer_id.to_string(),
         receiver_id: transaction.transaction.receiver_id.to_string(),
     };
