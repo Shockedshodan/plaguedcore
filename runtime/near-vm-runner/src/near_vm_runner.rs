@@ -40,8 +40,10 @@ const VM_FEATURES: Features = Features {
     memory64: WASM_FEATURES.memory64,
     exceptions: WASM_FEATURES.exceptions,
     mutable_global: true,
-    saturating_float_to_int: true,
-    sign_extension: true,
+    // These are blocked at prepare by pwasm parser, but once that is gone these are going to be
+    // the only check we have.
+    saturating_float_to_int: false,
+    sign_extension: false,
 };
 
 #[derive(Clone)]
@@ -235,7 +237,7 @@ impl NearVmConfig {
 //  major version << 6
 //  minor version
 const VM_CONFIG: NearVmConfig = NearVmConfig {
-    seed: (2 << 10) | (0 << 6) | 0,
+    seed: (2 << 10) | (1 << 6) | 1,
     engine: NearVmEngine::Universal,
     compiler: NearVmCompiler::Singlepass,
 };
@@ -616,8 +618,7 @@ impl finite_wasm::max_stack::SizeConfig for MaxStackCfg {
             ValType::F32 => 4,
             ValType::F64 => 8,
             ValType::V128 => 16,
-            ValType::FuncRef => 8,
-            ValType::ExternRef => 8,
+            ValType::Ref(_) => 8,
         }
     }
     fn size_of_function_activation(

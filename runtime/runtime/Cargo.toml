@@ -1,10 +1,12 @@
 [package]
 name = "node-runtime"
-version = "0.0.0"
-license = "MIT OR Apache-2.0"
+version.workspace = true
 authors.workspace = true
-publish = false
 edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
 
 [dependencies]
 borsh.workspace = true
@@ -33,7 +35,6 @@ near-vm-runner.workspace = true
 [features]
 default = []
 dump_errors_schema = ["near-vm-errors/dump_errors_schema"]
-protocol_feature_flat_state = ["near-store/protocol_feature_flat_state", "near-vm-logic/protocol_feature_flat_state"]
 nightly_protocol = ["near-primitives/nightly_protocol"]
 no_cpu_compatibility_checks = ["near-vm-runner/no_cpu_compatibility_checks"]
 

@@ -2,7 +2,9 @@ use near_primitives::shard_layout::ShardUId;
 use std::time::Duration;
 use std::{collections::HashMap, iter::FromIterator};
 
-use crate::trie::DEFAULT_SHARD_CACHE_TOTAL_SIZE_LIMIT;
+use crate::trie::{
+    DEFAULT_SHARD_CACHE_DELETIONS_QUEUE_CAPACITY, DEFAULT_SHARD_CACHE_TOTAL_SIZE_LIMIT,
+};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -85,6 +87,9 @@ pub struct StoreConfig {
     /// with block processing.
     pub background_migration_threads: usize,
 
+    /// Enables background flat storage creation.
+    pub flat_storage_creation_enabled: bool,
+
     /// Duration to perform background flat storage creation step. Defines how
     /// frequently we check creation status and execute work related to it in
     /// main thread (scheduling and collecting state parts, catching up blocks, etc.).
@@ -151,7 +156,6 @@ impl StoreConfig {
     pub const fn col_cache_size(&self, col: crate::DBCol) -> bytesize::ByteSize {
         match col {
             crate::DBCol::State => self.col_state_cache_size,
-            #[cfg(feature = "protocol_feature_flat_state")]
             crate::DBCol::FlatState => self.col_state_cache_size,
             _ => bytesize::ByteSize::mib(32),
         }
@@ -198,6 +202,7 @@ impl Default for StoreConfig {
                     ShardUId { version: 1, shard_id: 3 },
                     3_000_000_000,
                 )]),
+                shard_cache_deletions_queue_capacity: DEFAULT_SHARD_CACHE_DELETIONS_QUEUE_CAPACITY,
             },
 
             // Use default sized caches for view calls, because they don't impact
@@ -219,6 +224,8 @@ impl Default for StoreConfig {
             // We checked that this number of threads doesn't impact
             // regular block processing significantly.
             background_migration_threads: 8,
+
+            flat_storage_creation_enabled: true,
 
             // It shouldn't be very low, because on single flat storage creation step
             // we do several disk reads from `FlatStateMisc` and `FlatStateDeltas`.
@@ -275,6 +282,9 @@ pub struct TrieCacheConfig {
     pub default_max_bytes: u64,
     /// Overwrites `default_max_bytes` for specific shards.
     pub per_shard_max_bytes: HashMap<ShardUId, u64>,
+    /// Limit the number of elements in caches deletions queue for specific
+    /// shard
+    pub shard_cache_deletions_queue_capacity: usize,
 }
 
 impl Default for TrieCacheConfig {
@@ -282,6 +292,7 @@ impl Default for TrieCacheConfig {
         Self {
             default_max_bytes: DEFAULT_SHARD_CACHE_TOTAL_SIZE_LIMIT,
             per_shard_max_bytes: Default::default(),
+            shard_cache_deletions_queue_capacity: DEFAULT_SHARD_CACHE_DELETIONS_QUEUE_CAPACITY,
         }
     }
 }
