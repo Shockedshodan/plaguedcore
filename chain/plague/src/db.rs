@@ -47,7 +47,7 @@ pub struct MiddleManRow {
 impl MiddleManRow {
     pub(crate) fn insert(&self, db: &Db) -> anyhow::Result<()> {
         db.conn.execute(
-            "INSERT INTO transactions(validator, balance_nonce, tx_hash, signer_id, receiver_id) values (?1,?2,?3,?4,?5)",
+            "INSERT INTO forwarded_transactions(validator, balance_nonce, tx_hash, signer_id, receiver_id) values (?1,?2,?3,?4,?5)",
             params![
                 self.validator,
                 self.balance_nonce,
